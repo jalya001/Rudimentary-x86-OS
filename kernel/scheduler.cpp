@@ -29,22 +29,16 @@ uint32_t scheduler(uint32_t old_esp) {
     case READY:
       current_running = current_running->next;
       break;
+    case BLOCKED: // removes from ready queue because it's in a blocked queue now
     case EXITED:
       if (current_running->next == current_running) halt();
       to_remove = current_running;
       current_running = current_running->next;
       to_remove->prev->next = to_remove->next;
       to_remove->next->prev = to_remove->prev;
-      to_remove->next = 0;
-      to_remove->prev = 0;
+      to_remove->next = nullptr;
+      to_remove->prev = nullptr;
       break;
-    case BLOCKED:
-        /* TODO: a blocked thread is still alive and needs a wait queue to
-         * live on, not deletion. This falls out of scope until 
-         * synchronization primitives exist and something actually sets
-         * BLOCKED. Leaving unhandled (falls through to default) rather than
-         * silently doing the wrong thing.
-         */
     case RUNNING:
     default:
       break;
@@ -63,4 +57,29 @@ void r0_exit() {
 void r3_exit() { // For when interrupts already get disabled
   current_running->state = EXITED;
   scheduler_entry();
+}
+
+void block(tcb_t **q) {
+  current_running->state = BLOCKED;
+
+  if (*q == nullptr) {
+    *q = current_running;
+  } else {
+    tcb_t *t = *q;
+    while (t->next != nullptr) t = t->next;
+    t->next = current_running;
+  }
+
+  scheduler_entry();
+}
+
+void unblock(tcb_t **q) {
+  tcb_t *t = *q;
+  *q = (*q)->next;
+
+  t->state = READY;
+  t->next = current_running->next;
+  t->prev = current_running;
+  current_running->next->prev = t;
+  current_running->next = t;
 }

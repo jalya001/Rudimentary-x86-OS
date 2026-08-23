@@ -96,4 +96,4 @@ struct SwitchFrame {
 };
 
 void fd_write(int fd, const char *msg);
-inline void halt();
+void halt();

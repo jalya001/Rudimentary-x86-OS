@@ -13,7 +13,7 @@
 
 extern "C" void kernel_main();
 
-inline void halt() {
+void halt() {
   while (1) asm volatile("hlt");
 }
 
@@ -135,7 +135,7 @@ void kernel_main() {
 
   serial_print("Hello World.\n");
   vga_write("Hello World\n");
-
+/*
   uint8_t sector[512];
   rc = ata_read_sector(0, sector);
   if (rc < 0) fd_write(1, "disk read error\n");
@@ -149,7 +149,7 @@ void kernel_main() {
   rc = ata_read_sector(TEST_LBA, sector);
   if (rc < 0) fd_write(1, "disk read error\n");
   kprintf("Test disk write: 0x%x%x = 0xBEEF\n", sector[222], sector[223]);
-
+*/
   /* A placeholder TCB representing kernel_main's own execution context, so
    * switching away from it doesn't collide with the first real thread.
    */
@@ -158,11 +158,22 @@ void kernel_main() {
   boot_thread.prev = &boot_thread;
   current_running = &boot_thread;
 
+  thread_create<false>(lock_test_1);
+  thread_create<false>(lock_test_2);
+  thread_create<false>(condition_test_waiter);
+  thread_create<false>(condition_test_signaler);
+  thread_create<false>(semaphore_test_1);
+  thread_create<false>(semaphore_test_2);
+  thread_create<false>(barrier_test_1);
+  thread_create<false>(barrier_test_2);
+  thread_create<false>(barrier_test_3);
+
+/*
   thread_create<true>(test_writes);
   thread_create<true>(test_writes_2);
   thread_create<false>(kthread1);
   thread_create<true>(test_writes_3);
-
+*/
   //thread_create<true>(stress_a);
   //thread_create<true>(stress_b);
   
