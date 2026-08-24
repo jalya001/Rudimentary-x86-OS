@@ -4,22 +4,13 @@
 #include "scheduler.hpp"
 
 inline static void lock_acquire_helper(Lock *l) {
-  switch (l->status) {
-    case UNLOCKED:
-      l->status = LOCKED;
-      break;
-    case LOCKED:
-      block(&l->queue);
-      break;
-  }
+  while (l->status == LOCKED) block(&l->queue); // needs to be a loop because mulltiple could be unblocked at once
+  l->status = LOCKED;
 }
 
 inline static void lock_release_helper(Lock *l) {
-  if (l->queue == nullptr) {
-    l->status = UNLOCKED;
-  } else {
-    unblock(&l->queue);
-  }
+  l->status = UNLOCKED;
+  if (l->queue != nullptr) unblock(&l->queue);
 }
 
 void Lock::acquire() {
