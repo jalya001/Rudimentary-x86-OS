@@ -10,6 +10,7 @@
 #include "test.hpp"
 #include "pic.hpp"
 #include <sleep.hpp>
+#include <syslib.hpp>
 
 extern "C" void kernel_main();
 
@@ -81,6 +82,15 @@ tcb_t *thread_create(void (*entry_fn)()) {
   * mirrors what scheduler_entry itself pushes/pops.
   */
   uint8_t *top = (uint8_t *)t->kernel_stack.sp;
+
+  if constexpr (User) {
+    t->user_stack.sp -= sizeof(uint32_t);
+    *(uint32_t *)t->user_stack.sp = (uint32_t)call_exit;
+  } else {
+    top -= sizeof(uint32_t);
+    *(uint32_t *)top = (uint32_t)r0_exit;
+  }
+
   top -= sizeof(SwitchFrame);
   auto *frame = (SwitchFrame *)top;
   t->kernel_stack.sp = (uintptr_t)frame;
@@ -158,6 +168,21 @@ void kernel_main() {
   boot_thread.prev = &boot_thread;
   current_running = &boot_thread;
 
+  //thread_create<false>(test_mbox_1_basic_send_recv);
+  thread_create<false>(kthread1);
+  thread_create<false>(kthread1);
+  thread_create<true>(test_writes);
+  thread_create<true>(test_writes_2);
+  /*
+  thread_create<false>(test_mbox_2_blocking_recv);
+  thread_create<false>(test_mbox_2_blocking_sender);
+  thread_create<false>(test_mbox_3_multiple_messages);
+  thread_create<false>(test_mbox_4_producer1);
+  thread_create<false>(test_mbox_4_producer2);
+  thread_create<false>(test_mbox_4_consumer);
+  thread_create<false>(test_mbox_5_wraparound);
+*/
+/*
   thread_create<false>(lock_test_1);
   thread_create<false>(lock_test_2);
   thread_create<false>(condition_test_waiter);
@@ -167,7 +192,7 @@ void kernel_main() {
   thread_create<false>(barrier_test_1);
   thread_create<false>(barrier_test_2);
   thread_create<false>(barrier_test_3);
-
+*/
 /*
   thread_create<true>(test_writes);
   thread_create<true>(test_writes_2);
