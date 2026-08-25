@@ -20,6 +20,7 @@ The OS has the following attributes and properties:
 | Simple Privilege Levels     | Y | . |
 | System Call Interface       | Y | We have system calls. |
 | Traditional Synchronization | Y | We have all the synchronization primitives. |
+| Mailbox System              | Y | . |
 | Static Device Drivers       | - | All device drivers are hard-coded into the OS, and only keyboard, disk, serial, and screen are supported. |
 | ATA PIO Disk Driver         | Y | very simple |
 | CLI-based                   | - | The only inteface is a command-line / shell. |
@@ -550,11 +551,11 @@ barrier_init(barrier_t)
 barrier_wait(barrier_t)
 
 # 9 Interprocess Communication
+Say a process wants to pass information to another. The first naive approach would be to directly modify the other's memory. It is more efficient, but regarded as "scary" because memory space should be strongly separated to avoid the unforgivable sin of one task corrupting another. The second naive approach, a shared buffer, would work fine assuming both processes use the same convention for it. But since they usually have to use a convention anyway, it is better to make one the default. And this default, like every default ever, features unnecessary copying. Because directly read/writing the memory would clearly be a most profane abomination.
 
+A thread using a mailbox uses receive to grab a message in the mailbox or waits until one is sent if there is none. And uses send to put a message in the mailbox. These are managed with condition synchronization. Messages are variable length and multiple can be present in a mailbox at once.
 
 Interface:
-
-mbox_init 
 
 mbox_open 
 
