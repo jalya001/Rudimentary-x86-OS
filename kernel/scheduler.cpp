@@ -74,6 +74,8 @@ void block(tcb_t **q) {
 }
 
 void unblock(tcb_t **q) {
+  if (*q == nullptr) fd_write(1, "ERROR: unblocking a nullpointer\n");
+
   tcb_t *t = *q;
   *q = (*q)->next;
 

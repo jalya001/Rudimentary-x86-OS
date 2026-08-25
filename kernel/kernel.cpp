@@ -168,12 +168,7 @@ void kernel_main() {
   boot_thread.prev = &boot_thread;
   current_running = &boot_thread;
 
-  //thread_create<false>(test_mbox_1_basic_send_recv);
-  thread_create<false>(kthread1);
-  thread_create<false>(kthread1);
-  thread_create<true>(test_writes);
-  thread_create<true>(test_writes_2);
-  /*
+  thread_create<false>(test_mbox_1_basic_send_recv);
   thread_create<false>(test_mbox_2_blocking_recv);
   thread_create<false>(test_mbox_2_blocking_sender);
   thread_create<false>(test_mbox_3_multiple_messages);
@@ -181,7 +176,10 @@ void kernel_main() {
   thread_create<false>(test_mbox_4_producer2);
   thread_create<false>(test_mbox_4_consumer);
   thread_create<false>(test_mbox_5_wraparound);
-*/
+  thread_create<false>(test_mbox_6_producer);
+  thread_create<false>(test_mbox_6_consumer);
+  
+  
 /*
   thread_create<false>(lock_test_1);
   thread_create<false>(lock_test_2);
@@ -191,8 +189,7 @@ void kernel_main() {
   thread_create<false>(semaphore_test_2);
   thread_create<false>(barrier_test_1);
   thread_create<false>(barrier_test_2);
-  thread_create<false>(barrier_test_3);
-*/
+  thread_create<false>(barrier_test_3);*/
 /*
   thread_create<true>(test_writes);
   thread_create<true>(test_writes_2);
@@ -202,7 +199,7 @@ void kernel_main() {
   //thread_create<true>(stress_a);
   //thread_create<true>(stress_b);
   
-  fd_write(1, "Stress test starting - let this run for at least 1-2 minutes\n");
+  //fd_write(1, "Stress test starting - let this run for at least 1-2 minutes\n");
 
   r0_exit();    // hand off to the first real thread
 

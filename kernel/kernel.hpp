@@ -1,6 +1,7 @@
 #pragma once
 
 #include <minstd/types.hpp>
+#include "entry.hpp"
 
 #define STACKS_START 0x20000
 #define STACK_SIZE 0x2000
@@ -96,4 +97,12 @@ struct SwitchFrame {
 };
 
 void fd_write(int fd, const char *msg);
+
+#define critical_kprintf(fmt, ...) \
+  do { \
+    enter_critical(); \
+    kprintf(fmt __VA_OPT__(,) __VA_ARGS__); \
+    leave_critical(); \
+  } while (0)
+
 void halt();
