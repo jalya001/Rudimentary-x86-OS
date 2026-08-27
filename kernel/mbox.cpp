@@ -38,7 +38,7 @@ int Mbox::stat(int *messages_out, int *space_out) {
   return 1;
 }
 
-int Mbox::send(Message *m) {
+int Mbox::send(Message *m) { // need a size check to see it doesn't exceed buffer size
   int msize = MSG_SIZE(m);
   lock.acquire();
   while (space_available(this) < msize) freed_space.wait(&lock);

@@ -5,7 +5,7 @@
 
 #define STACKS_START 0x20000
 #define STACK_SIZE 0x2000
-#define STACKS_END 0x40000
+#define STACKS_END 0x60000
 
 #define PROCESS_LIMIT 8
 #define THREAD_LIMIT 12
@@ -95,14 +95,5 @@ struct SwitchFrame {
   uint32_t edi, esi, ebp, esp_unused, ebx, edx, ecx, eax;
   uint32_t return_eip;
 };
-
-void fd_write(int fd, const char *msg);
-
-#define critical_kprintf(fmt, ...) \
-  do { \
-    enter_critical(); \
-    kprintf(fmt __VA_OPT__(,) __VA_ARGS__); \
-    leave_critical(); \
-  } while (0)
 
 void halt();

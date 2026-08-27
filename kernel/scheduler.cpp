@@ -2,6 +2,7 @@
 #include "gdt.hpp"
 #include "scheduler.hpp"
 #include "entry.hpp"
+#include "print.hpp"
 
 void r0_yield() {
   direct_scheduler_entry();
@@ -74,7 +75,7 @@ void block(tcb_t **q) {
 }
 
 void unblock(tcb_t **q) {
-  if (*q == nullptr) fd_write(1, "ERROR: unblocking a nullpointer\n");
+  if (*q == nullptr) kprintf("ERROR: unblocking a nullpointer\n");
 
   tcb_t *t = *q;
   *q = (*q)->next;

@@ -29,3 +29,5 @@ void test_mbox_4_consumer();
 void test_mbox_5_wraparound();
 void test_mbox_6_producer();
 void test_mbox_6_consumer();
+
+void kthread2();

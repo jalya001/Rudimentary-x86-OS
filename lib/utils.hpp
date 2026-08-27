@@ -3,8 +3,9 @@
 void clear_screen(int minx, int miny, int maxx, int maxy);
 void scroll(int minx, int miny, int maxx, int maxy);
 
-int screen_print(int line, int col, char *in, ...);
-int serial_print(char *in, ...);
+void screen_print(const char *in, ...);
+void serial_print(const char *in, ...);
+void uprintf(const char *in, ...);
 
 void reverse(char *s);
 int strlen(const char *s);

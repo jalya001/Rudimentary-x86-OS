@@ -66,25 +66,27 @@ scheduler_entry:
   popa
   ret
 
+
 syscall_entry:
   pushal
 
   # args
-  pushl	%edx
-  pushl	%ecx
-  pushl	%ebx
-  pushl	%eax
+  pushl %edi
+  pushl %esi
+  pushl %edx
+  pushl %ecx
+  pushl %ebx
+  pushl %eax
 
-  push %eax
-  push $si_msg
+  pushl %eax
+  pushl $si_msg
   call fault_print
-  add $8, %esp
-  
+  addl $8, %esp
+
   call syscall_handler
-  add $16, %esp # pop args
+  addl $24, %esp  # 6 × 4 bytes
 
   popal
-
   iret
 
 direct_scheduler_entry:

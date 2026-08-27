@@ -1,5 +1,7 @@
 #pragma once
 
+#include <minstd/types.hpp>
+
 void call_yield(void);
 void call_exit(void);
 int getpid(void);
@@ -12,7 +14,7 @@ int mbox_send(int q, char *m);
 */
 int getchar(int *c);
 
-void call_write(const char *msg);
+void call_write(int fd, const char *fmt, uint32_t *args);
 
 int readdir(unsigned char *buf);
 void loadproc(int location, int size);

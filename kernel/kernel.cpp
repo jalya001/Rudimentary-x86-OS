@@ -11,6 +11,7 @@
 #include "pic.hpp"
 #include <sleep.hpp>
 #include <syslib.hpp>
+#include "print.hpp"
 
 extern "C" void kernel_main();
 
@@ -27,11 +28,6 @@ IdAllocator tid_allocator = { 1, THREAD_LIMIT };
 Process processes[PROCESS_LIMIT];
 Thread thread_pool[THREAD_LIMIT];     // static pool: no heap/allocator exists yet
 
-void fd_write(int fd, const char *msg) { // fd not used yet though
-  serial_print(msg);
-  vga_write(msg);
-}
-
 extern "C" void fault_print(const char* name, uint32_t error) {
   kprintf("%s=%d (not necessarily an error code)\n", name, error);
 }
@@ -39,7 +35,7 @@ extern "C" void fault_print(const char* name, uint32_t error) {
 void init_syscalls() {
   syscalls[SYS_YIELD] = (syscall_t)scheduler_entry;
   syscalls[SYS_EXIT] = (syscall_t)r3_exit;
-  syscalls[SYS_WRITE] = (syscall_t)fd_write;
+  syscalls[SYS_WRITE] = (syscall_t)fd_printf_internal;
 }
 
 extern "C" void syscall_handler(uint32_t syscall_id, uint32_t arg1, uint32_t arg2, uint32_t arg3) { // could have used the trapframe instead but lazy
@@ -141,7 +137,7 @@ void kernel_main() {
   init_syscalls();
   
   rc = ata_init();
-  if (rc < 0) fd_write(1, "DISK INIT ERROR\n");
+  if (rc < 0) kprintf("DISK INIT ERROR\n");
 
   serial_print("Hello World.\n");
   vga_write("Hello World\n");
@@ -168,6 +164,9 @@ void kernel_main() {
   boot_thread.prev = &boot_thread;
   current_running = &boot_thread;
 
+  thread_create<false>(kthread2);
+  thread_create<true>(test_writes);
+  /*
   thread_create<false>(test_mbox_1_basic_send_recv);
   thread_create<false>(test_mbox_2_blocking_recv);
   thread_create<false>(test_mbox_2_blocking_sender);
@@ -179,8 +178,6 @@ void kernel_main() {
   thread_create<false>(test_mbox_6_producer);
   thread_create<false>(test_mbox_6_consumer);
   
-  
-/*
   thread_create<false>(lock_test_1);
   thread_create<false>(lock_test_2);
   thread_create<false>(condition_test_waiter);
@@ -191,7 +188,6 @@ void kernel_main() {
   thread_create<false>(barrier_test_2);
   thread_create<false>(barrier_test_3);*/
 /*
-  thread_create<true>(test_writes);
   thread_create<true>(test_writes_2);
   thread_create<false>(kthread1);
   thread_create<true>(test_writes_3);

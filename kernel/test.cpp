@@ -1,19 +1,32 @@
 #include <syslib.hpp>
 #include <sleep.hpp>
 #include "sync.hpp"
-#include "drivers/serial.hpp"
 #include "mbox.hpp"
+#include "print.hpp"
+#include <utils.hpp>
+
+void kthread2() {
+  while (1) {
+    sleep(1000);
+    kprintf("greetings %d\n", 5);
+  }
+}
+void test_writes() {
+  uprintf("Test 1 begin\n");
+
+  while (1) { sleep(500); uprintf("Test 1 testing 111111111\n"); sleep(500); }
+}
 
 Lock print_lock;
 
 void locked_print(const char* s) {
   print_lock.acquire();
-  fd_write(1, s);
+  kprintf(s);
   print_lock.release();
 }
 
 void print(const char* s) {
-  fd_write(1, s);
+  kprintf(s);
 }
 
 void print_stack(uint32_t bytes) {
@@ -32,31 +45,25 @@ void assert(bool condition) { if (!condition) { critical_kprintf("ERROR: asserti
 
 
 
-void test_writes() {
-  call_write("Test 1 begin\n");
-
-  while (1) { sleep(500); call_write("Test 1 testing 111111111\n"); sleep(500); }
-  //while (1) { call_yield(); }
-}
 
 void test_writes_2() {
-  call_write("Test 2 automatic exit\n");
-  //while (1) { sleep(500); call_write("Test 2 testing 2222\n"); sleep(500); }
+  uprintf("Test 2 automatic exit\n");
+  //while (1) { sleep(500); uprintf("Test 2 testing 2222\n"); sleep(500); }
 }
 
 void test_writes_3() {
-  call_write("Test 3 begin\n");
+  uprintf("Test 3 begin\n");
 
-  while (1) { sleep(500); call_write("Test 3 testing 3\n"); sleep(500); }
+  while (1) { sleep(500); uprintf("Test 3 testing 3\n"); sleep(500); }
 }
 
 void test_exiter() {
-  call_write("Exiter: running once, exiting now\n");
+  uprintf("Exiter: running once, exiting now\n");
   call_exit();
 }
 
 void test_after_exit() {
-  call_write("AfterExit: I'm alive — reused a freed stack slot\n");
+  uprintf("AfterExit: I'm alive — reused a freed stack slot\n");
   while (1) { call_yield(); }
 }
 
@@ -66,13 +73,13 @@ void noop_thread() {
 
 void stress_a() { 
   while (1) { 
-    call_write("A\n"); 
+    uprintf("A\n"); 
   } 
 }
 
 void stress_b() { 
   while (1) { 
-    call_write("B\n"); 
+    uprintf("B\n"); 
   } 
 }
 
@@ -122,8 +129,8 @@ void condition_test_waiter() {
   locked_print("C1: acquired\n");
 
   while (!ready) {
-      locked_print("C1: waiting\n");
-      condition.wait(&condition_lock);
+    locked_print("C1: waiting\n");
+    condition.wait(&condition_lock);
   }
 
   locked_print("C1: woke\n");
