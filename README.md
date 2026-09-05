@@ -26,23 +26,35 @@ The OS has the following attributes and properties:
 | CLI-based                   | - | The only inteface is a command-line / shell. |
 
 # 1 How to use
-We recommend using it with an emulator.
+In terms of physical hardware, it is today only legacy machines that are capable of running this, which you are unlikely to have lying around. So we heavily recommend emulating the hardware instead.
 
-If you are booting from a USB, the image has to be "burned" onto it.
+## 1.1 Hardware Requirements
+The CPU needs to be x86 32-bit, obviously
 
 Disk needs to have an ATA interface. Many modern disks lack it, so you probably need an emulation layer.
 
-With Bochs, use an image as a disk rather than USB?
+does not support usb keyboard
 
+## 1.2 Compilation
 explain the makefile we provide
-
-does not support usb keyboard?
 
 Note we compile using GCC. We are using AT&T syntax for assembly which is default for GAS.
 
 Have to compile without thunking so we can control where code is
 
+## 1.3 From Emulator
+Instuctions on how to set up Bochs for this
+
+With Bochs, use an image as a disk rather than USB?
+
 We have provided a bochsrc configuration. To use it, it needs to be placed wherever bochs looks for it.
+
+## 1.4 From USB
+There is no installer to this OS, and it is very difficult to manually transplant an OS into a machine, so we only detail the much simpler booting from a USB device. This however, has the adverse effect of all disk actions having to inefficiently pass through the USB device
+
+The the image has to be "burned" onto the USB.
+
+You select the USB as the device to boot from in your machine's bootloader.
 
 # 2 Design Overview
 | Section |
@@ -78,6 +90,7 @@ kernel/
 ├── pic.c/h
 ├── synchronization.c/h
 ├── memory.c/h
+├── paging.c/h
 ├── mailbox.c/h
 ├── fs/
 │   ├── fs.c/h
@@ -129,6 +142,13 @@ user/
 | 1                 | Program Directory  |
 | 1                 | Shell              |
 | Many              | Programs           |
+
+## 2.3 Volatile Memory Layout
+
+| Space | Description |
+| ----- | ----------- |
+| ?     | Kernel Space |
+
 
 # 3 Startup
 When a CPU using x86 architecture first loads up, it enters its reset state, which is in Real Mode (16bit) with interrupts disabled. It then reads and runs the physical address 0xFFFF0 where the BIOS firmware is. The BIOS then selects a bootable device to jump to.
@@ -249,11 +269,15 @@ CR0 bits:
 This consists of initializing all the parts of the kernel, each of which is shown later.
 
 # 4 Programs, Processes, & Threads
-For some definitions, a program is loaded from disk and in our case runs as a single process. Each process has a single thread without the opportunity to obtain more. The kernel has daemons (background services) operating with a single thread each. Threads run and do work. Processes do not do work.
+A program is loaded from disk and in our case runs as a single process. Each process has a single thread without the opportunity to obtain more (for now). The kernel has daemons (background services) operating with a single thread each. Threads run and do work. Processes do not do work.
 
-a process owns descriptors and address space, threads are schedulable and have execution context
+a process owns descriptors and address space. this space is managed via system calls to parts as detailed under ths section on memory management
+
+threads are schedulable and have execution context
 
 no process parent/child relations
+
+Central to the OS orthodoxy, is the idea that each task should not be able to disrupt others, even if it results in some inefficiency.
 
 System calls:
 
@@ -267,8 +291,7 @@ System calls:
 | `void thread_yield()` | Give up CPU. |
 | `pid_t get_pid()` | Returns pid of current process. |
 | `tid_t get_tid()` | Returns tid of current thread. | 
-| `map_memory` | For allocating address space. |
-| `unmap_memory` | |
+
 
 ## 4.1 Programs
 All programs are listed on the Program Directory, which is located at a specific part of the disk (q.v. Disk Layout), and occupies only one sector in our case. On startup, the location is determined, and the directory read into memory. 
@@ -279,6 +302,7 @@ Our programs are
 Created, ready, running, blocked, exit
 
 process address space given by memory manager
+their own heap each
 
 pcbs are in a doubly linked list
 
@@ -528,7 +552,9 @@ enter_critical
 leave_critical
 leave_critical_delayed
 
-Synchronization Primitives
+## Synchronization Primitives
+Standard ones you are probably well familiar with and don't need to be explained.
+
 
 Mutex
 lock_init(lock_t)
@@ -551,7 +577,9 @@ barrier_init(barrier_t)
 barrier_wait(barrier_t)
 
 # 9 Interprocess Communication
-Say a process wants to pass information to another. The first naive approach would be to directly modify the other's memory. It is more efficient, but regarded as "scary" because memory space should be strongly separated to avoid the unforgivable sin of one task corrupting another. The second naive approach, a shared buffer, would work fine assuming both processes use the same convention for it. But since they usually have to use a convention anyway, it is better to make one the default. And this default, like every default ever, features unnecessary copying. Because directly read/writing the memory would clearly be a most profane abomination.
+Say a process wants to pass information to another. The first naive approach would be to directly modify the other's memory. It is more efficient, but regarded as "scary" because memory space should be strongly separated to avoid the unforgivable sin of one task corrupting another. The second naive approach, a shared buffer, would work fine assuming both processes use the same convention for it. But since they usually have to use a convention anyway, it is better to make one the default.
+
+That default is the mailbox system. It features two unnecessary copies.
 
 A thread using a mailbox uses receive to grab a message in the mailbox or waits until one is sent if there is none. And uses send to put a message in the mailbox. These are managed with condition synchronization. Messages are variable length and multiple can be present in a mailbox at once.
 
@@ -567,62 +595,73 @@ mbox_recv
 
 mbox_stat 
 
+## 9.x Dispatchers
+A thing that sends to multiple mailboxes. It is very simple since it simply does that.
 
 
-# 10 Virtual Memory
-rewrite to use block abstraction?
+# 10 Volatile Memory Management
+An OS wants some information to be able to persist in some form readily accessible for the processor.
 
-This virtual memory mechanism requires us to have a virtual address space for every (user) process. Where during use, these virtual addresses get translated to physical addresses. 
+That has already been done in loading the kernel code/data for instance, residing in one part of the RAM, which owing to how it is only used internally, with all other uses specially configured, it can be treated like a static block, a distinct area of managed memory, because it is not managed. Likewise, there are potentially some hardware-reserved regions, but they do not need to be interacted with by the OS, and so are also not managed. Both these cases do not require elaborate memory management.
 
+The remaining area is used for dynamic allocations by the kernel and allocations of and by user processes. The latter owing to us following a conventional process model. This is the managed area of memory.
 
-## .1 Address Translations
+## 10.1 Address Space Management
+When tasks use memory, there should be a way for them not to collide with each other's regions, and also avoid extending into unintended areas like the kernel. Leaving that to each task to self-regulate is unacceptable when tasks are supposed to never interfere with each other, which crosses out local protocols in favor of centralized management. And so it is conceived of that each process is allocated address space(s), and that there is a registry keeping track of permissions and so on for these spaces or parts of them.
 
-## .x Address Space Allocation
-Provides the following system calls:
-mmap
-munmap
+That alone is sufficient, but not complete in terms of capturing boilerplate. Processes need to keep track of what parts of memory they manage, which is complicated when allocated space is not reliably contiguous, or alternatively parts of memory are not allowed to be divided, and large caves are left unfilled. Also that moving address chunks around would require complicated signaling.
 
+The solution to that is per-process virtual memory. Virtual memory is a mapping of virtual addresses to eventual physical ones, allowing a structure to be represented contiguously in virtual memory despite no corresponding or fragmented physical presence. It is "per process" since though a single pool allows easy movement and incontiguity of physical parts, it has far greater fragmentation risk, owing to the lesser flexibility and the sheer amount of addresses being fewer.
 
-## .1 Paging
+Yet, there remains much fragmentation risk. Virtual addresses are not easily relocable because there is no in-built mechanism for managing all pointers in case of movements. That inevitably hinders large contiguous allocations, usually so during long sessions, and there is no perfect solution for it. There are known measures which can be taken to reduce the likelihood of especially bad fragmentation patterns, but not are not much taken here. Note part of the motivation for why 32-bit was largely superceded by 64-bit was to increase the address space as to make the especially bad fragmentation patterns less likely.
 
-## .2 Two-level Paging 
+A side-effect of virtual memory is that the virtual address space could be extended to use disk space as further memory. Which has to be managed such that information in disk but not in memory needs to be loaded into memory, usually swapping something back into disk in exchange.
 
+A next complication is that we are also following a model of separate ring 0 and ring 3 privilege levels, raising the question of whether in per-process the content for the two levels should be in separate virtual spaces. The orthodox answer to this is no, splitting the dynamic space in two, one part for the kernel only, present in every process. The advantage is to avoid invalidating the TLB each time privileges switch by referencing what is already there. With the disadvantage of reducing the amount of potential addresses for both kernel and processes, increasing fragmentation risk.
 
-### .2.1 Entry Structures 
+There is an internal functions for allocating user address space. And the kernel exposes a system call for allocating and deallocating user space memory each.
+
+## 10.2 Undetermined Use
+Another query one may raise about memory use in general is how "undetermined use" is managed (note it is not a standard term). It refers to how it sometimes is impossible to predict how much memory a task is going to consume. In contrast to predetermined use, where you can cleanly allocate a slot of fixed size somewhere to cover the use without wasting space and without having to expand it later.
+
+The naive solution to undetermined use, the "better safe than sorry approach" of generously endowing each instance of undetermined use, quickly becomes a massive waste of space, and a demand-based approach is necessary for any serious management. For that, a typical approach involves memory structures capable of reserving space without physically occupying it, lazy-allocation. That is done by committing virtual addresses for something without committing corresponding physical ones.
+
+The typical way of organizing that for each dynamic space is by a pool shared among many heaps (or only one for kernel). When one of these heaps wants to allocate, it walks its holding of blocks of its virtual space to find a contiguous space, splits the block upon selection, and then it requests memory for that from the pool, conceptually. This is further granulizable by lazy-allocating with the heap allocations, such that no memory is committed until actually written. In our case, either of #1 pools, allocated like that by `malloc`, whereas `calloc` does write it. And #2 stacks, not committing memory until the stack pointer reaches the frontier. Stacks are only created for threads, done so upon initializing them. There are not any clear weaknesses of this system, so there is no reason not to use it.
+
+In UNIX there are more contours, say with a distinct main stack capable of resizing, but none of that is implemented here.
+
+## 10.3 Demand-paging
+And as for implementations of virtual memory, the most relevant one is paging. Hardware also supports segmentation, but standard setups consist of obsoleting it like is done here. Heterodox implementations are rarely worth it due to lacking hardware support involving much more overhead.
+
+Reserving memory consists of allocating virtual addresses. And allocating physical memory consists of then using the reserved memory, triggering a page-fault.
+
+decides how the physical memory pool is managed via a page replacement algorithm
+
+### 10.3.1 Two-level Entry Structures 
 Functionalities of the bits in both entries:
 
-| Bit     | Code     | Description                                                                                                                           |
-|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------|
-| 0       | P        | Present: Whether page is in physical memory. Used for page faults.                                                                    |
-| 1       | R/W      | Read/Write: 1 = Read/Write, 0 = Read Only  only.                                                                                      |
-| 2       | U/S      | User/Supervisor: Privilege level required to access. 1 = user level processes can access, 0 = only supervisor can. Important for PTs. |
-| 3       | PWT      | Write-Through: Enables write-through caching.                                                                                         |
-| 4       | PCD      | Cache Disable: Disables caching.                                                                                                      |
-| 5       | A        | Accessed: Whether a PTE was read during a virtual address translation.                                                                |
-| 6       | AVL / D  | (PD) Empty. (PT) Dirty: Whether the page was written on after being loaded.                                                           |
-| 7       | PS / PAT | (PD) Page Size: PT is 4KB or a 4 MB. (PT) Page Attribute Table.                                                                       |
-| 8       | AVL / G  | (PD) Empty. (PT) Global.                                                                                                              |
-| 9 - 11  | AVL      | Empty.                                                                                                                                |
-| 12 - 31 | ptr      | Address of (PD) Page Table or (PT) Page Frame in physical memory.                                                                     |
+| Bit     | Code     | Description                                                                                         |
+|---------|----------|-----------------------------------------------------------------------------------------------------|
+| 0       | P        | Present: Whether page is in physical memory. Used for page faults.                                  |
+| 1       | R/W      | Read/Write: 1 = Read/Write, 0 = Read Only.                                                          |
+| 2       | U/S      | User/Supervisor: Privilege level to access. 1 = user level, 0 = supervisor only. Important for PTs. |
+| 3       | PWT      | Write-Through: Enables write-through caching.                                                       |
+| 4       | PCD      | Cache Disable: Disables caching.                                                                    |
+| 5       | A        | Accessed: Whether a PTE was read during a virtual address translation.                              |
+| 6       | AVL / D  | (PD) Empty. (PT) Dirty: Whether the page was written on after being loaded.                         |
+| 7       | PS / PAT | (PD) Page Size: PT is 4KB or a 4 MB. (PT) Page Attribute Table.                                     |
+| 8       | AVL / G  | (PD) Empty. (PT) Global.                                                                            |
+| 9 - 11  | AVL      | Empty.                                                                                              |
+| 12 - 31 | ptr      | Address of (PD) Page Table or (PT) Page Frame in physical memory.                                   |
 
-
-
-## .3 Page Faults 
+### 10.3.3 Page Faults 
 exposes page_fault_handler for the interrupt
 
+### 10.3.4 Allocating Pages
 
-## .4 Allocating Pages
+### 10.3.5 Swapping Pages
 
-
-## .5 Swapping Pages
-
-## .6 Setup
-yes
-
-### .6.1 Initialization
-
-### .6.2 Page Entries Setup
-
+### 10.3.6 Initialization
 
 # 11 File System
 Arbitrary storage is an essential part of user operating systems, and the disk is utilized for that by writing data into it, in our case, into the Datablocks sectors. However, for that to be of any use, the data should not be written where there already is data, and it should be retrievable in a predictable manner. Or else, your data is constantly going to be overwritten, corrupted, and require scanning the entire storage space to find. In mind of that, a system is required, a file system.
@@ -773,6 +812,28 @@ When the number of links hits 0, it is necessary to free the inode, or else we a
 
 
 # 12 Keyboard Driver
+A keyboard driver is needed to interpret and pass on the input of the keyboard. Because we have no USB support, this is only a PS/2 driver (Personal System/2), which only supports keyboards using the PS/2 protocol.
+
+## 12.1 Flow
+When the keyboard is pressed, PIC calls IRQ1. This is then taken to a kernel function which reads port 0x60 for an 8-bit scancode. The scancode is put through a table to be mapped to ASCII. The first 7 bits are the keycode, while the final bit is whether the key is being released or held. Reading that port also consumes the input, readying the keyboard controller to signal the next input.
+
+If multiple keyboard strokes are registered before the computer has finished the previous IRQ1 or otherwise is in a critical section, it does not get interrupted to handle the stroke. It only has the PIC get one interrupt request. This, and the fact keyboards can be pressed rapidly, is why keyboards normally have something like a small FIFO buffer to hold strokes. An aspect that is usually not configured nor configurable by the OS.
+
+Since it is not certain the threads anticipating keyboard output are able to immediately collect it, since another thread may be on the CPU, it is necessary to store the keyboard output in a kernel-level buffer. And since that buffer is going to be reused indefinitely, it is necessary for it to wrap once full.
+
+## 12.2 Multiple Consumers
+When implemented with a standard mailbox, multiple consumers are bound to consume content such that they get mangled messages, contrary to the desired functionality of each consumer getting the same output. To solve this, there are three intuitive solutions:
+
+#1 "Barrier per message", where the cursor on the content is not allowed to advance until all consumers have read it. However, this has firstly the kink of a late registrar potentially reading content from before its registration. And secondly, there is no telling when a consumer is going to read the content, which easily ends up blocking the others for a long time. And in the worst case, this could result in lost keyboard input because the buffer gets filled. For the principle that no faulty process should be able to disrupt others, this is unacceptable, since a tricksy troll could design a program to register as a keyboard consumer, and then never read keyboard output, permanently blocking the keyboard for all processes.
+
+#2 "Many cursors", where consumption only advances the cursor of that consumer. However, this encounters the problem of a slow consumer getting its target overwritten once the buffer wraps, resulting in reading the wrong keystrokes. Wither which one patch is for no cursor to advance beyond the eldest, but this yet ends up in a similar situation to #1, since a faulty process could idle to permanently block the keyboard as well.
+
+#3 "Many output buffers", where the keyboard handler outputs to every active consumer's buffer. This is comparatively inefficient, but is also the orthodox solution, since there is no way to prevent a faulty consumer from blocking the keyboard without ensuring none of the consumers are dependent on each other. In line with the orthodoxy, this is our chosen concept. This is implemented by giving each consumer a mailbox served by a dispatcher in the keyboard driver. When these mailboxes overflow, they drop newer content.
+
+## 12.3 Initialization
+A careful initialization should drain 0x60 first before unmasking IRQ1
+
+
 Uses mailbox
 
 keyboard_init 
